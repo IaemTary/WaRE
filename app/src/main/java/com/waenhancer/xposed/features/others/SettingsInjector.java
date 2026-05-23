@@ -389,7 +389,7 @@ public class SettingsInjector extends Feature {
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 1.0f
             );
-            textContainerParams.leftMargin = dp(activity, 24);
+            textContainerParams.setMarginStart(dp(activity, 24));
             textContainer.setLayoutParams(textContainerParams);
 
             // Title TextView
@@ -473,7 +473,7 @@ public class SettingsInjector extends Feature {
                         new ViewGroup.MarginLayoutParams(size, size);
                 params.topMargin = margin / 2;
                 params.bottomMargin = margin / 2;
-                params.rightMargin = margin;
+                params.setMarginEnd(margin);
                 button.setLayoutParams(params);
                 toolbar.addView(button);
                 return;
@@ -486,7 +486,7 @@ public class SettingsInjector extends Feature {
             int margin = dp(activity, 12);
             FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(size, size, Gravity.TOP | Gravity.END);
             params.topMargin = margin;
-            params.rightMargin = margin;
+            params.setMarginEnd(margin);
             ((FrameLayout) root).addView(floatingButton, params);
         } catch (Throwable t) {
             XposedBridge.log("[WaEnhancerX] SettingsInjector: direct button error: " + t.getMessage());
