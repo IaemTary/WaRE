@@ -137,7 +137,17 @@ public class ContactPickerActivity extends BaseActivity {
             runOnUiThread(() -> Toast.makeText(this, e.getMessage(), Toast.LENGTH_SHORT).show());
         }
 
-        return new ArrayList<>(uniqueContacts.values());
+        List<SelectableContact> resultList = new ArrayList<>(uniqueContacts.values());
+        resultList.sort((c1, c2) -> {
+            if (c1.isSelected() && !c2.isSelected()) {
+                return -1;
+            } else if (!c1.isSelected() && c2.isSelected()) {
+                return 1;
+            } else {
+                return c1.getName().compareToIgnoreCase(c2.getName());
+            }
+        });
+        return resultList;
     }
 
     private void filterContacts(@NonNull String query) {
