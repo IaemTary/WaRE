@@ -139,6 +139,9 @@ public abstract class BasePreferenceFragment extends PreferenceFragmentCompat
         setDisplayHomeAsUpEnabled(true);
         initializeReleaseChannelPreference();
         setupReleaseChannelPreference();
+
+        // Lockdown pro preferences dynamically if not verified
+        com.waenhancer.xposed.utils.ProHelper.updatePreferences(requireContext(), getPreferenceScreen());
     }
 
     @Override

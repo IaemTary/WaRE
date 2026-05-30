@@ -77,7 +77,7 @@ public class SeparateGroup extends Feature {
         // Setting tab count
         hookTabCount();
     }
-
+    
     @NonNull
     @Override
     public String getPluginName() {

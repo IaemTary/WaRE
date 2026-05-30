@@ -1,58 +1,93 @@
 package com.waenhancer.preference;
 
 import android.content.Context;
+import android.content.Intent;
 import android.text.Html;
 import android.util.AttributeSet;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.preference.PreferenceManager;
 
 import com.waenhancer.BuildConfig;
+import com.waenhancer.activities.LicenseActivity;
 
-import rikka.material.preference.MaterialSwitchPreference;
+/**
+ * Refactored ProSwitchPreference: converted from a standard preference to a MaterialSwitchPreference
+ * that toggles when Pro is active, or redirects to LicenseActivity when Pro is not active.
+ */
+public class ProSwitchPreference extends rikka.material.preference.MaterialSwitchPreference {
 
-public class ProSwitchPreference extends MaterialSwitchPreference {
-
-    public ProSwitchPreference(Context context, AttributeSet attrs) {
-        super(context, attrs);
-        init(context, attrs);
-    }
-
-    public ProSwitchPreference(Context context, AttributeSet attrs, int defStyleAttr) {
-        super(context, attrs, defStyleAttr);
-        init(context, attrs);
-    }
-
-    public ProSwitchPreference(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
+    public ProSwitchPreference(@NonNull Context context, @Nullable AttributeSet attrs, int defStyleAttr, int defStyleRes) {
         super(context, attrs, defStyleAttr, defStyleRes);
-        init(context, attrs);
+        init(context);
     }
 
-    private void init(Context context, AttributeSet attrs) {
+    public ProSwitchPreference(@NonNull Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
+        super(context, attrs, defStyleAttr);
+        init(context);
+    }
+
+    public ProSwitchPreference(@NonNull Context context, @Nullable AttributeSet attrs) {
+        super(context, attrs);
+        init(context);
+    }
+
+    private void init(Context context) {
+        // Format the title to display the Pro badge
         CharSequence originalTitle = getTitle();
         if (originalTitle == null) {
-            originalTitle = "";
+            originalTitle = "Pro Feature";
         }
-
+        
         if (BuildConfig.HAS_PRO_FEATURES) {
-            // Built with pro features - display Pro chip in purple
             String newTitle = originalTitle + " <font color='#8B5CF6'><b>[Pro]</b></font>";
             setTitle(Html.fromHtml(newTitle, Html.FROM_HTML_MODE_LEGACY));
         } else {
-            // Built without pro features - display missing pro module chip in red
             String newTitle = originalTitle + " <font color='#EF4444'><b>[missing pro module]</b></font>";
             setTitle(Html.fromHtml(newTitle, Html.FROM_HTML_MODE_LEGACY));
-            
-            // Disable preference entirely
             setEnabled(false);
-            
-            // Force state to false and save it
-            setChecked(false);
-            var prefs = getSharedPreferences() != null
-                    ? getSharedPreferences()
-                    : PreferenceManager.getDefaultSharedPreferences(getContext());
-            if (getKey() != null) {
-                prefs.edit().putBoolean(getKey(), false).apply();
-            }
         }
+
+        updateSummary();
+    }
+
+    /**
+     * Updates the summary text dynamically based on the verified status.
+     */
+    private void updateSummary() {
+        if (!BuildConfig.HAS_PRO_FEATURES) {
+            setSummary("Pro module not loaded");
+            return;
+        }
+
+        boolean isVerified = getSafeSharedPreferences().getBoolean("is_pro_verified", false);
+        if (isVerified) {
+            setSummary("Status: Pro Active");
+        } else {
+            setSummary("Activate Pro First");
+        }
+    }
+
+    @Override
+    protected void onClick() {
+        boolean isVerified = getSafeSharedPreferences().getBoolean("is_pro_verified", false);
+        if (isVerified) {
+            super.onClick();
+        } else {
+            Context context = getContext();
+            Intent intent = new Intent(context, LicenseActivity.class);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            context.startActivity(intent);
+        }
+    }
+
+    @NonNull
+    private android.content.SharedPreferences getSafeSharedPreferences() {
+        android.content.SharedPreferences prefs = getSharedPreferences();
+        if (prefs != null) {
+            return prefs;
+        }
+        return PreferenceManager.getDefaultSharedPreferences(getContext());
     }
 }

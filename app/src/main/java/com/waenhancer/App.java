@@ -77,6 +77,9 @@ public class App extends Application {
                 firebaseCrashlyticsClass.getMethod("setCrashlyticsCollectionEnabled", boolean.class).invoke(crashlyticsInstance, enableCrashAnalytics);
             } catch (Throwable ignored) {
             }
+
+            // Perform silent background license re-verification at startup
+            com.waenhancer.xposed.utils.LicenseManager.silentCheck(App.this);
         }
         
         var sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);

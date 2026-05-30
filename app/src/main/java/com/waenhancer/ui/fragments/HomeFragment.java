@@ -61,6 +61,7 @@ public class HomeFragment extends BaseFragment {
     private FragmentHomeBinding binding;
     private String pendingUpdateUrl;
     private String pendingUpdateVersion;
+    private BroadcastReceiver proStatusReceiver;
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -83,6 +84,13 @@ public class HomeFragment extends BaseFragment {
                 }
             }
         }, intentFilter, ContextCompat.RECEIVER_EXPORTED);
+
+        proStatusReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                updateProUI();
+            }
+        };
     }
 
     public View onCreateView(@NonNull LayoutInflater inflater,
@@ -313,6 +321,16 @@ public class HomeFragment extends BaseFragment {
             startActivity(intent);
         });
 
+        binding.proStatusChip.setOnClickListener(v -> {
+            animateClick(v);
+            if (!com.waenhancer.xposed.utils.ProHelper.isProEnabled()) {
+                Intent intent = new Intent(requireContext(), com.waenhancer.activities.LicenseActivity.class);
+                startActivity(intent);
+            } else {
+                Toast.makeText(requireContext(), "Pro Active: " + com.waenhancer.xposed.utils.ProHelper.getProPlanName(), Toast.LENGTH_SHORT).show();
+            }
+        });
+
         setupReleaseChannelSelector();
         setupUpdateBanner();
         startCardAnimations();
@@ -320,6 +338,20 @@ public class HomeFragment extends BaseFragment {
         showConsentDialogIfNeeded();
 
         return binding.getRoot();
+    }
+
+    @Override
+    public void onViewCreated(@NonNull android.view.View view, @Nullable android.os.Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+        if (binding != null && binding.proStatusChip != null) {
+            binding.proStatusChip.setOnClickListener(v -> {
+                android.content.Context context = getContext();
+                if (context != null) {
+                    android.content.Intent intent = new android.content.Intent(context, com.waenhancer.activities.LicenseActivity.class);
+                    context.startActivity(intent);
+                }
+            });
+        }
     }
     
     private void showConsentDialogIfNeeded() {
@@ -436,6 +468,58 @@ public class HomeFragment extends BaseFragment {
         syncReleaseChannelToInstalled();
         checkForUpdates();
         checkStateWpp(requireActivity());
+
+        if (proStatusReceiver != null && getContext() != null) {
+            var proFilter = new IntentFilter(requireContext().getPackageName() + ".ACTION_PRO_STATUS_CHANGED");
+            ContextCompat.registerReceiver(requireContext(), proStatusReceiver, proFilter, ContextCompat.RECEIVER_NOT_EXPORTED);
+        }
+
+        updateProUI();
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        if (proStatusReceiver != null && getContext() != null) {
+            requireContext().unregisterReceiver(proStatusReceiver);
+        }
+    }
+
+    private void updateProUI() {
+        if (binding == null || getContext() == null) return;
+        boolean isPro = com.waenhancer.xposed.utils.ProHelper.isProEnabled();
+        String planName = com.waenhancer.xposed.utils.ProHelper.getProPlanName();
+        String proStatus = com.waenhancer.xposed.utils.ProHelper.getProStatus();
+        
+        if (binding.proStatusChip != null) {
+            String text = "ACTIVE".equalsIgnoreCase(proStatus) ? planName : "Free";
+            binding.proStatusChip.setText(text);
+            
+            // Dynamically update chip's background tint and text colors based on status
+            if ("ACTIVE".equalsIgnoreCase(proStatus)) {
+                // Premium light green background with dark green text for Active Pro
+                binding.proStatusChip.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFFE8F5E9));
+                binding.proStatusChip.setTextColor(0xFF2E7D32);
+            } else if ("EXPIRED".equalsIgnoreCase(proStatus)) {
+                // Light red background with dark red text for Expired Pro
+                binding.proStatusChip.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFFFFEBEE));
+                binding.proStatusChip.setTextColor(0xFFC62828);
+            } else {
+                // Standard default background tint and primary color text for Free status
+                android.util.TypedValue typedValueContainer = new android.util.TypedValue();
+                android.util.TypedValue typedValuePrimary = new android.util.TypedValue();
+                if (requireContext().getTheme().resolveAttribute(com.google.android.material.R.attr.colorPrimaryContainer, typedValueContainer, true)) {
+                    binding.proStatusChip.setBackgroundTintList(android.content.res.ColorStateList.valueOf(typedValueContainer.data));
+                } else {
+                    binding.proStatusChip.setBackgroundTintList(null); // fallback
+                }
+                if (requireContext().getTheme().resolveAttribute(android.R.attr.colorPrimary, typedValuePrimary, true)) {
+                    binding.proStatusChip.setTextColor(typedValuePrimary.data);
+                } else {
+                    binding.proStatusChip.setTextColor(0xFF000000); // generic fallback
+                }
+            }
+        }
     }
 
     @SuppressLint("StringFormatInvalid")
