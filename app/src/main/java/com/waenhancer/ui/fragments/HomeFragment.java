@@ -323,12 +323,8 @@ public class HomeFragment extends BaseFragment {
 
         binding.proStatusChip.setOnClickListener(v -> {
             animateClick(v);
-            if (!com.waenhancer.xposed.utils.ProHelper.isProEnabled()) {
-                Intent intent = new Intent(requireContext(), com.waenhancer.activities.LicenseActivity.class);
-                startActivity(intent);
-            } else {
-                Toast.makeText(requireContext(), "Pro Active: " + com.waenhancer.xposed.utils.ProHelper.getProPlanName(), Toast.LENGTH_SHORT).show();
-            }
+            Intent intent = new Intent(requireContext(), com.waenhancer.activities.LicenseActivity.class);
+            startActivity(intent);
         });
 
         setupReleaseChannelSelector();
@@ -492,7 +488,14 @@ public class HomeFragment extends BaseFragment {
         String proStatus = com.waenhancer.xposed.utils.ProHelper.getProStatus();
         
         if (binding.proStatusChip != null) {
-            String text = "ACTIVE".equalsIgnoreCase(proStatus) ? planName : "Free";
+            String text;
+            if ("ACTIVE".equalsIgnoreCase(proStatus)) {
+                text = planName;
+            } else if ("EXPIRED".equalsIgnoreCase(proStatus)) {
+                text = "License Expired";
+            } else {
+                text = "Free";
+            }
             binding.proStatusChip.setText(text);
             
             // Dynamically update chip's background tint and text colors based on status
