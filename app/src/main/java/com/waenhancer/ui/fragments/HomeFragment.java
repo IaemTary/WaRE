@@ -832,8 +832,6 @@ public class HomeFragment extends BaseFragment {
 
             if (isSupported) {
                 boolean isBetaModule = BuildConfig.VERSION_NAME.toLowerCase().contains("beta");
-                // log beta
-                Log.d("WAE_BETA", "isBetaModule: " + isBetaModule);
                 if (!isBetaModule) {
 
                 if (ApkMirrorFeedHelper.isBetaVersion(activity, packageName, installedVersion)) {

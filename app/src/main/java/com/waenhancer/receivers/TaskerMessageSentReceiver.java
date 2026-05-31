@@ -37,7 +37,7 @@ public class TaskerMessageSentReceiver extends BroadcastReceiver {
             forwardIntent.addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES);
             context.sendBroadcast(forwardIntent);
         } catch (Exception e) {
-            Log.d(TAG, "Failed to forward broadcast to " + packageName + ": " + e.getMessage());
+            Log.e(TAG, "Failed to forward broadcast to " + packageName, e);
         }
     }
 }
