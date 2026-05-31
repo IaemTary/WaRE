@@ -520,6 +520,9 @@ public class HomeFragment extends BaseFragment {
                     binding.proStatusChip.setTextColor(0xFF000000); // generic fallback
                 }
             }
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                binding.proStatusChip.setCompoundDrawableTintList(binding.proStatusChip.getTextColors());
+            }
         }
     }
 
