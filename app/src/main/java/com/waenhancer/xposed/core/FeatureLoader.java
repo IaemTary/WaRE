@@ -19,7 +19,6 @@ import androidx.annotation.NonNull;
 import androidx.core.content.ContextCompat;
 
 import com.waenhancer.App;
-
 import com.waenhancer.BuildConfig;
 import com.waenhancer.UpdateChecker;
 import com.waenhancer.xposed.core.components.AlertDialogWpp;
