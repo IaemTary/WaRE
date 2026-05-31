@@ -272,7 +272,7 @@ jobs:
           body_path: changelog.txt
           files: |
             release_artifacts/WaEnhancerX-v${{ env.NEW_VERSION_NAME }}.apk
-          tag_name: ${{ env.NEW_VERSION_NAME }}
+          tag_name: ${{ env.NEW_VERSION_CODE }}-${{ env.NEW_VERSION_NAME }}
           prerelease: ${{ env.RELEASE_PRERELEASE }}
 
       - name: Read changelog
