@@ -208,7 +208,19 @@ android {
             }
         }
     }
+
+    applicationVariants.all {
+        val variant = this
+        variant.outputs.forEach {
+            val output = it as? com.android.build.gradle.api.ApkVariantOutput
+            if (output != null) {
+                val debugSuffix = if (variant.buildType.name == "debug") "-debug" else ""
+                output.outputFileName = "WaEnhancerX-v${variant.versionName}${debugSuffix}.apk"
+            }
+        }
+    }
 }
+
 
 dependencies {
     implementation(libs.colorpicker)

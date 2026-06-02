@@ -120,3 +120,16 @@
 # Firebase reflection safety
 -dontwarn com.google.firebase.**
 -keep class com.google.firebase.** { *; }
+
+# =============================================================================
+# 6. FRAGMENT REFLECTION SAFETY (KEEP FRAGMENTS INSTANTIATED FROM XML)
+# =============================================================================
+# Keep all Fragment subclasses and their constructors intact because they are 
+# referenced in preference XML files by their fully qualified names.
+-keep public class * extends androidx.fragment.app.Fragment {
+    public <init>();
+}
+
+# Keep all fragment classes in UI fragments and Xposed features others package to prevent ClassNotFoundException
+-keep class com.waenhancer.ui.fragments.** { *; }
+-keep class com.waenhancer.xposed.features.others.** { *; }
