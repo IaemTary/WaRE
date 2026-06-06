@@ -6,3 +6,4 @@
 
 [Fixes]
 - Fixed sending file as audio note
+- Fixed Hide Blue Ticks

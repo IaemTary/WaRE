@@ -46,7 +46,6 @@ public class ProviderSharedPreferences implements SharedPreferences {
         } catch (Throwable t) {
             Utils.log("[WAEX] ProviderSharedPreferences: Observer registration critical failure: " + t.getMessage());
         }
-        Utils.log("[WAEX] ProviderSharedPreferences: Initialization complete. Local cache size: " + localPrefs.getAll().size());
     }
 
     private void registerObserver() {
@@ -204,7 +203,6 @@ public class ProviderSharedPreferences implements SharedPreferences {
             ;
             Bundle result = callProvider("get_all_preferences", null);
             if (result == null) {
-                Utils.log("[WAEX] ProviderSharedPreferences: Hydration failed (null result). Using fallback.");
                 if (fallbackPrefs == null) return;
                 var editor = localPrefs.edit().clear();
                 for (Map.Entry<String, ?> entry : fallbackPrefs.getAll().entrySet()) {

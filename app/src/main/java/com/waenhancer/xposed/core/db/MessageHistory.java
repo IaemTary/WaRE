@@ -9,6 +9,7 @@ import android.util.LruCache;
 
 import androidx.annotation.Nullable;
 
+import com.waenhancer.BuildConfig;
 import com.waenhancer.xposed.core.components.FMessageWpp;
 import com.waenhancer.xposed.utils.Utils;
 
@@ -36,18 +37,45 @@ public class MessageHistory extends SQLiteOpenHelper {
         VIEW_ONCE_TYPE
     }
 
-    public MessageHistory(Context context) {
-        super(context, "MessageHistory.db", null, 4);
+    public static final String DATABASE_NAME = BuildConfig.APPLICATION_ID.replace('.', '_') + "_message_history.db";
+
+    public MessageHistory(Context context, String name) {
+        super(context, name, null, 7);
         messagesCache = new LruCache<>(MESSAGE_CACHE_SIZE);
         seenMessageCache = new LruCache<>(SEEN_MESSAGE_CACHE_SIZE);
         seenMessagesListCache = new LruCache<>(SEEN_MESSAGES_LIST_CACHE_SIZE);
     }
 
+    public MessageHistory(Context context) {
+        this(context, DATABASE_NAME);
+    }
+
     public static MessageHistory getInstance() {
         synchronized (MessageHistory.class) {
-            if (mInstance == null || !mInstance.getReadableDatabase().isOpen()) {
-                mInstance = new MessageHistory(Utils.getApplication());
-                mInstance.dbWrite = mInstance.getWritableDatabase();
+            try {
+                if (mInstance == null || mInstance.dbWrite == null || !mInstance.getReadableDatabase().isOpen()) {
+                    try {
+                        mInstance = new MessageHistory(Utils.getApplication());
+                        mInstance.dbWrite = mInstance.getWritableDatabase();
+                    } catch (Throwable t) {
+                        Utils.log("[WAEX] Error initializing " + DATABASE_NAME + ": " + t.getMessage() + ". Falling back to in-memory database.");
+                        try {
+                            mInstance = new MessageHistory(Utils.getApplication(), null);
+                            mInstance.dbWrite = mInstance.getWritableDatabase();
+                        } catch (Throwable t2) {
+                            Utils.log("[WAEX] Failed to initialize in-memory database: " + t2.getMessage());
+                        }
+                    }
+                }
+            } catch (Throwable t) {
+                Utils.log("[WAEX] Critical error checking/initializing MessageHistory instance: " + t.getMessage());
+                // Try emergency in-memory setup
+                try {
+                    mInstance = new MessageHistory(Utils.getApplication(), null);
+                    mInstance.dbWrite = mInstance.getWritableDatabase();
+                } catch (Throwable t2) {
+                    Utils.log("[WAEX] Failed emergency in-memory database: " + t2.getMessage());
+                }
             }
         }
         return mInstance;
@@ -55,6 +83,7 @@ public class MessageHistory extends SQLiteOpenHelper {
 
     public final void insertMessage(String messageKey, String message, long timestamp) {
         synchronized (this) {
+            if (dbWrite == null) return;
             ContentValues contentValues0 = new ContentValues();
             contentValues0.put("message_key", messageKey);
             contentValues0.put("text_data", message);
@@ -71,6 +100,10 @@ public class MessageHistory extends SQLiteOpenHelper {
         ArrayList<MessageItem> cachedMessages = messagesCache.get(messageKey);
         if (cachedMessages != null) {
             return cachedMessages;
+        }
+
+        if (dbWrite == null) {
+            return null;
         }
 
         // If not in cache, query database
@@ -96,6 +129,7 @@ public class MessageHistory extends SQLiteOpenHelper {
 
     public final void insertHideSeenMessage(String jid, String message_id, MessageType type, boolean viewed) {
         synchronized (this) {
+            if (dbWrite == null) return;
             if (updateViewedMessage(jid, message_id, type, viewed)) {
                 return;
             }
@@ -114,6 +148,7 @@ public class MessageHistory extends SQLiteOpenHelper {
     }
 
     public boolean updateViewedMessage(String jid, String message_id, MessageType type, boolean viewed) {
+        if (dbWrite == null) return false;
         Cursor cursor = dbWrite.query("hide_seen_messages", new String[]{"_id"}, "jid=? AND message_id=? AND type =?", new String[]{jid, message_id, String.valueOf(type.ordinal())}, null, null, null);
         if (!cursor.moveToFirst()) {
             cursor.close();
@@ -139,6 +174,10 @@ public class MessageHistory extends SQLiteOpenHelper {
         MessageSeenItem cachedItem = seenMessageCache.get(cacheKey);
         if (cachedItem != null) {
             return cachedItem;
+        }
+
+        if (dbWrite == null) {
+            return null;
         }
 
         // If not in cache, query database
@@ -169,6 +208,10 @@ public class MessageHistory extends SQLiteOpenHelper {
             return cachedList;
         }
 
+        if (dbWrite == null) {
+            return null;
+        }
+
         // If not in cache, query database
         Cursor cursor = dbWrite.query("hide_seen_messages", new String[]{"jid", "message_id", "viewed"}, "jid=? AND type=? AND viewed=?", new String[]{jid, String.valueOf(type.ordinal()), viewed ? "1" : "0"}, null, null, null);
         if (!cursor.moveToFirst()) {
@@ -196,17 +239,32 @@ public class MessageHistory extends SQLiteOpenHelper {
     public void onCreate(SQLiteDatabase sqLiteDatabase) {
         sqLiteDatabase.execSQL("create table MessageHistory(_id INTEGER PRIMARY KEY AUTOINCREMENT, message_key TEXT NOT NULL, text_data TEXT NOT NULL, editTimestamp BIGINT DEFAULT 0 );");
         sqLiteDatabase.execSQL("create table hide_seen_messages(_id INTEGER PRIMARY KEY AUTOINCREMENT, jid TEXT NOT NULL, message_id TEXT NOT NULL,type INT NOT NULL, viewed INT DEFAULT 0);");
+        
+        // Proper indexing
+        sqLiteDatabase.execSQL("CREATE INDEX idx_message_history_key ON MessageHistory(message_key);");
+        sqLiteDatabase.execSQL("CREATE UNIQUE INDEX idx_hide_seen_unique ON hide_seen_messages(jid, message_id, type);");
+        sqLiteDatabase.execSQL("CREATE INDEX idx_hide_seen_query ON hide_seen_messages(jid, type, viewed);");
     }
 
     @Override
     public void onUpgrade(SQLiteDatabase sqLiteDatabase, int oldVersion, int newVersion) {
-        if (oldVersion < 2) {
-            sqLiteDatabase.execSQL("create table hide_seen_messages(_id INTEGER PRIMARY KEY AUTOINCREMENT, jid TEXT NOT NULL, message_id TEXT NOT NULL,type INT NOT NULL, viewed INT DEFAULT 0);");
-        }
-        if (oldVersion < 4) {
-            // Migrate MessageHistory to use message_key (string) instead of row_id (long)
+        if (oldVersion < 7) {
+            Utils.log("[WAEX] Upgrading database from version " + oldVersion + " to " + newVersion + " (version < 7). Recreating all tables to apply the new schema and indexes.");
             sqLiteDatabase.execSQL("DROP TABLE IF EXISTS MessageHistory;");
-            sqLiteDatabase.execSQL("create table MessageHistory(_id INTEGER PRIMARY KEY AUTOINCREMENT, message_key TEXT NOT NULL, text_data TEXT NOT NULL, editTimestamp BIGINT DEFAULT 0 );");
+            sqLiteDatabase.execSQL("DROP TABLE IF EXISTS hide_seen_messages;");
+            onCreate(sqLiteDatabase);
+        }
+    }
+
+    @Override
+    public void onDowngrade(SQLiteDatabase sqLiteDatabase, int oldVersion, int newVersion) {
+        try {
+            Utils.log("[WAEX] Database downgrade detected from version " + oldVersion + " to " + newVersion + ". Recreating tables.");
+            sqLiteDatabase.execSQL("DROP TABLE IF EXISTS MessageHistory;");
+            sqLiteDatabase.execSQL("DROP TABLE IF EXISTS hide_seen_messages;");
+            onCreate(sqLiteDatabase);
+        } catch (Throwable t) {
+            Utils.logError("Failed to handle database downgrade: " + t.getMessage());
         }
     }
 

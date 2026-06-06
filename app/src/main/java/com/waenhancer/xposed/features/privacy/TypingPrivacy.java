@@ -24,7 +24,6 @@ public class TypingPrivacy extends Feature {
     public void doHook() throws Throwable {
         // Obfuscated method hooks for Ghost Mode and Always Typing are now handled
         // dynamically via the composing manager Handler in AlwaysTyping.java.
-        XposedBridge.log("[WAEX] TypingPrivacy: Hooking deferred to AlwaysTyping Handler hook.");
     }
 
     @NonNull

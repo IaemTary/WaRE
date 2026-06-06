@@ -28,6 +28,7 @@ import com.waenhancer.xposed.core.components.SharedPreferencesWrapper;
 import com.waenhancer.xposed.core.components.WaContactWpp;
 import com.waenhancer.xposed.core.devkit.Unobfuscator;
 import com.waenhancer.xposed.core.devkit.UnobfuscatorCache;
+import com.waenhancer.xposed.core.db.MessageHistory;
 import com.waenhancer.xposed.features.customization.BubbleColors;
 import com.waenhancer.xposed.features.media.StatusDownload;
 import com.waenhancer.xposed.features.general.AntiRevoke;
@@ -89,7 +90,6 @@ import com.waenhancer.xposed.features.privacy.CustomPrivacy;
 import com.waenhancer.xposed.features.privacy.DndMode;
 import com.waenhancer.xposed.features.privacy.FreezeLastSeen;
 import com.waenhancer.xposed.features.privacy.HideChat;
-import com.waenhancer.xposed.features.privacy.HideReceipt;
 import com.waenhancer.xposed.features.privacy.HideSeen;
 import com.waenhancer.xposed.features.privacy.LockedChatsEnhancer;
 import com.waenhancer.xposed.features.privacy.TagMessage;
@@ -394,8 +394,24 @@ public class FeatureLoader {
             UnobfuscatorCache.init(mApp);
             SharedPreferencesWrapper.hookInit(mApp.getClassLoader());
 
-            ;
             ResId.initLocal(mApp);
+
+            if (providerPrefs instanceof XSharedPreferences) {
+                XSharedPreferences xpref = (XSharedPreferences) providerPrefs;
+                xpref.reload();
+                var all = xpref.getAll();
+                if (all == null || all.isEmpty()) {
+                    var localPrefs = mApp.getSharedPreferences("wae_embedded_prefs", Context.MODE_PRIVATE);
+                    providerPrefs = new com.waenhancer.xposed.bridge.client.ProviderSharedPreferences(mApp, localPrefs, providerPrefs);
+                    
+                    // Update global references
+                    Utils.xprefs = providerPrefs;
+                    Feature.DEBUG = providerPrefs.getBoolean("enablelogs", true);
+                    PerfLogger.setEnabled(providerPrefs.getBoolean("enable_perf_logs", false));
+                    Utils.DEBUG = Feature.DEBUG;
+                }
+            }
+
             initComponents(loader, providerPrefs);
             plugins(loader, providerPrefs, packageInfo.versionName);
 
@@ -431,6 +447,11 @@ public class FeatureLoader {
             XposedBridge.log("[WAEX] Failed to initialize FMessageWpp: " + t.getMessage());
         }
         try {
+            com.waenhancer.xposed.core.components.ProtocolTreeNodeWpp.initialize(loader);
+        } catch (Throwable t) {
+            XposedBridge.log("[WAEX] Failed to initialize ProtocolTreeNodeWpp: " + t.getMessage());
+        }
+        try {
             WppCore.Initialize(loader, pref);
             // Clear stale pending change titles from previous process.
             // Must be after WppCore.Initialize() so privPrefs is available.
@@ -457,6 +478,11 @@ public class FeatureLoader {
             WaContactWpp.initialize(loader);
         } catch (Throwable t) {
             XposedBridge.log("[WAEX] Failed to initialize WaContactWpp: " + t.getMessage());
+        }
+        try {
+            MessageHistory.getInstance();
+        } catch (Throwable t) {
+            XposedBridge.log("[WAEX] Failed to pre-initialize MessageHistory: " + t.getMessage());
         }
         
         // Track update check per session
@@ -805,7 +831,6 @@ public class FeatureLoader {
                 FreezeLastSeen.class,
                 TypingPrivacy.class,
                 HideChat.class,
-                HideReceipt.class,
                 HideSeen.class,
                 HideSeenView.class,
                 TagMessage.class,

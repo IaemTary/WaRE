@@ -113,7 +113,6 @@ public class Others extends Feature {
         var disable_defemojis = prefs.getBoolean("disable_defemojis", false);
         var autonext_status = prefs.getBoolean("autonext_status", false);
         var audio_type = Integer.parseInt(prefs.getString("audio_type", "0"));
-        XposedBridge.log("[WAEX] Others.doHook: loaded audio_type preference = " + audio_type);
         var audio_transcription = prefs.getBoolean("audio_transcription", false);
         var oldStatus = prefs.getBoolean("oldstatus", false);
         var igstatus = prefs.getBoolean("igstatus", false);
@@ -302,7 +301,6 @@ public class Others extends Feature {
         }
 
         if (prefs.getBoolean("selectable_message", false)) {
-            XposedBridge.log("[WAEX] selectable_message option enabled (Option 1 Dialog-based)");
             ConversationItemListener.conversationListeners.add(new ConversationItemListener.OnConversationItemListener() {
                 @Override
                 public void onItemBind(FMessageWpp fMessage, ViewGroup viewGroup) {
@@ -736,8 +734,6 @@ public class Others extends Feature {
         var jidClass = Unobfuscator.findFirstClassUsingName(classLoader, StringMatchType.EndsWith, "jid.Jid");
         var method = ReflectionUtils.findMethodUsingFilter(convClass, m -> m.getParameterCount() > 0 && !Modifier.isStatic(m.getModifiers()) && m.getParameterTypes()[0] == View.class && ReflectionUtils.findIndexOfType(m.getParameterTypes(), jidClass) != -1);
         var field = ReflectionUtils.getFieldByExtendType(convClass, refreshStatusClass);
-        logDebug("disablePhotoProfileStatus", Unobfuscator.getMethodDescriptor(method));
-        logDebug("disablePhotoProfileStatus Field", Unobfuscator.getFieldDescriptor(field));
         if (field == null) {
             ;
             return;
@@ -858,7 +854,6 @@ public class Others extends Feature {
         var emoji = prefs.getString("doubletap2like_emoji", "👍");
 
         var conversationRowClass = Unobfuscator.loadConversationRowClass(classLoader);
-        logDebug("Conversation Row", conversationRowClass);
 
         ConversationItemListener.conversationListeners.add(new ConversationItemListener.OnConversationItemListener() {
             @Override
@@ -935,7 +930,6 @@ public class Others extends Feature {
                     var key = fMessage.getKey();
                     if (key == null || TextUtils.isEmpty(key.messageID)) return;
                     if (!dumpedMessageIds.add(key.messageID)) return;
-                    logDebug("MessageMetaDump", fMessage.dumpDebugInfo());
                 } catch (Throwable t) {
                     logDebug("MessageMetaDumpError", t);
                 }
@@ -1383,7 +1377,6 @@ public class Others extends Feature {
 
     private void hookProps() throws Exception {
         var methodPropsBoolean = Unobfuscator.loadPropsBooleanMethod(classLoader);
-        logDebug(Unobfuscator.getMethodDescriptor(methodPropsBoolean));
         var dataUsageActivityClass = WppCore.getDataUsageActivityClass(classLoader);
 
         // ──────────────────────────────────────────────────────────────────────

@@ -115,6 +115,10 @@ android {
             excludes += "**.properties"
             excludes += "**.bin"
         }
+        jniLibs {
+            excludes += "lib/x86/**"
+            excludes += "lib/x86_64/**"
+        }
     }
 
     buildTypes {
@@ -224,7 +228,7 @@ android {
 
 dependencies {
     implementation(libs.colorpicker)
-    implementation(files("libs/dexkit-android.aar"))
+    implementation(libs.dexkit)
     implementation(libs.flatbuffers)
     compileOnly(libs.libxposed.legacy)
 

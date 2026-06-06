@@ -23,6 +23,7 @@ import androidx.core.content.ContextCompat;
 import androidx.preference.ListPreference;
 import androidx.preference.PreferenceFragmentCompat;
 import androidx.preference.PreferenceManager;
+import androidx.preference.TwoStatePreference;
 
 import com.waenhancer.App;
 import com.waenhancer.BuildConfig;
@@ -347,6 +348,22 @@ public abstract class BasePreferenceFragment extends PreferenceFragmentCompat
         }
     }
 
+    private void enforceBlueOnReplyDependency() {
+        var hideReadPreference = (TwoStatePreference) findPreference("hideread");
+        if (hideReadPreference == null) {
+            return;
+        }
+
+        boolean blueOnReply = mPrefs.getBoolean("blueonreply", false);
+        if (blueOnReply && !mPrefs.getBoolean("hideread", false)) {
+            runWithoutRestartBroadcast(() -> mPrefs.edit().putBoolean("hideread", true).apply());
+        }
+        if (blueOnReply && !hideReadPreference.isChecked()) {
+            runWithoutRestartBroadcast(() -> hideReadPreference.setChecked(true));
+        }
+        hideReadPreference.setEnabled(!blueOnReply);
+    }
+
     private void runWithoutRestartBroadcast(@NonNull Runnable runnable) {
         boolean previous = suppressRestartBroadcast;
         suppressRestartBroadcast = true;
@@ -440,6 +457,8 @@ public abstract class BasePreferenceFragment extends PreferenceFragmentCompat
         setPreferenceState("show_freezeLastSeen", !freezelastseen);
         setPreferenceState("showonlinetext", !freezelastseen);
         setPreferenceState("dotonline", !freezelastseen);
+
+        enforceBlueOnReplyDependency();
 
         boolean removeBottomTile = mPrefs.getBoolean("remove_status_bottom_tile", false);
         setPreferenceState("remove_status_quick_reactions", !removeBottomTile);

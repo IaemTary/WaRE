@@ -192,7 +192,6 @@ public class Unobfuscator {
                     .firstOrNull();
             if (result == null) {
                 if (name.contains("PhoneUserJid")) {
-                    XposedBridge.log("[WAEX] PhoneUserJid class not found. Falling back to UserJid class.");
                     String fallbackName = name.replace("PhoneUserJid", "UserJid");
                     var fallbackResult = dexkit.findClass(FindClass.create().matcher(ClassMatcher.create().className(fallbackName, type)))
                             .firstOrNull();
@@ -681,7 +680,6 @@ public class Unobfuscator {
                             .returnType(String.class)
                             .paramTypes(null, long.class)
                     ));
-                    XposedBridge.log("[WAEX] loadTimeToSecondsMethod (strict is24HourFormat): found " + resultList.size() + " candidates");
                 } catch (Exception ignored) {}
             }
 
@@ -693,7 +691,6 @@ public class Unobfuscator {
                         .returnType(String.class)
                         .paramTypes(null, long.class)
                 ));
-                XposedBridge.log("[WAEX] loadTimeToSecondsMethod (relaxed): found " + resultList.size() + " candidates");
             }
 
             if (resultList.isEmpty()) {
@@ -703,11 +700,6 @@ public class Unobfuscator {
                         .modifiers(Modifier.STATIC)
                         .returnType(String.class)
                 ));
-                XposedBridge.log("[WAEX] loadTimeToSecondsMethod (fallback): found " + resultList.size() + " candidates");
-            }
-
-            for (int i = 0; i < resultList.size(); i++) {
-                XposedBridge.log("[WAEX]   Candidate [" + i + "]: " + resultList.get(i).getDescriptor());
             }
 
             if (resultList.isEmpty()) {
@@ -719,13 +711,11 @@ public class Unobfuscator {
             for (var res : resultList) {
                 var method = res.getMethodInstance(classLoader);
                 if (method.getParameterCount() == 2 && method.getParameterTypes()[1] == long.class) {
-                    XposedBridge.log("[WAEX] Selecting candidate by parameter check: " + res.getDescriptor());
                     return method;
                 }
             }
 
             // Otherwise return the first static candidate
-            XposedBridge.log("[WAEX] Selecting first fallback candidate: " + resultList.get(0).getDescriptor());
             return resultList.get(0).getMethodInstance(classLoader);
         });
     }
@@ -3244,19 +3234,27 @@ public class Unobfuscator {
             var resultMethod = callers.stream().filter(i -> i.isMethod() && i.getDeclaredClassName().contains("IdentityVerificationActivity")).findFirst().orElse(null);
             if (resultMethod == null)
                 throw new RuntimeException("VerifyKey IdentityVerificationActivity caller not found");
-            try {
-                var usingNumbers = resultMethod.getUsingNumbers();
-                var findMagicNumber = false;
-                for (var i = 0; i < usingNumbers.size(); i++) {
-                    var n = usingNumbers.get(i);
-                    if (n.intValue() == 2966) {
-                        findMagicNumber = true;
-                    } else if (findMagicNumber) {
-                        return n;
+            
+            for (int x = 0; x <= 250; x++) {
+                if (x == 2966) continue;
+                var matcher = MethodMatcher.create()
+                        .declaredClass(resultMethod.getDeclaredClassName())
+                        .name(resultMethod.getMethodName())
+                        .addUsingNumber(2966)
+                        .addUsingNumber(x);
+                if (!dexkit.findMethod(FindMethod.create().matcher(matcher)).isEmpty()) {
+                    if (x != 1) {
+                        return x;
                     }
                 }
-            } catch (UnsatisfiedLinkError e) {
-                throw new RuntimeException("DexKit native method getUsingNumbers not available: " + e.getMessage(), e);
+            }
+            var matcherOne = MethodMatcher.create()
+                    .declaredClass(resultMethod.getDeclaredClassName())
+                    .name(resultMethod.getMethodName())
+                    .addUsingNumber(2966)
+                    .addUsingNumber(1);
+            if (!dexkit.findMethod(FindMethod.create().matcher(matcherOne)).isEmpty()) {
+                return 1;
             }
             throw new RuntimeException("VerifyKey int not found");
         });
@@ -3863,13 +3861,93 @@ public class Unobfuscator {
             throw new RuntimeException("getPageController method not found in StatusPlaybackContactFragment");
         });
     }
+    public synchronized static Class<?> loadProtocolTreeNodeClass(ClassLoader classLoader) throws Exception {
+        return UnobfuscatorCache.getInstance().getClass(classLoader, () -> {
+            Class<?> clazz = findFirstClassUsingStrings(classLoader, StringMatchType.Contains,
+                    "ProtocolTreeNode/getAttributeJid");
+            if (clazz == null) {
+                throw new ClassNotFoundException("ProtocolTreeNode class not found");
+            }
+            return clazz;
+        });
+    }
+
+    public synchronized static Class<?> loadKeyValueClass(ClassLoader classLoader) throws Exception {
+        return UnobfuscatorCache.getInstance().getClass(classLoader, () -> {
+            Class<?> clazz = findFirstClassUsingStrings(classLoader, StringMatchType.Contains,
+                    "KeyValue{key=");
+            if (clazz == null) {
+                throw new ClassNotFoundException("KeyValue class not found");
+            }
+            return clazz;
+        });
+    }
+
+    public synchronized static Class<?> loadReceiptMessageInfoClass(ClassLoader classLoader) throws Exception {
+        return UnobfuscatorCache.getInstance().getClass(classLoader, () -> {
+            var methods = dexkit.findMethod(
+                    FindMethod.create().matcher(
+                            MethodMatcher.create()
+                                    .usingStrings(Collections.singletonList("ReadReceiptUtils/buildReadReceiptHandler malformed"), StringMatchType.Contains, false)
+                    )
+            );
+            if (methods.isEmpty()) return null;
+            var methodData = methods.get(0);
+            var deviceJid = findFirstClassUsingName(classLoader, StringMatchType.EndsWith, "jid.DeviceJid");
+            for (var invoke : methodData.getInvokes()) {
+                if (invoke.isConstructor() && invoke.getParamTypeNames().contains(deviceJid.getName())) {
+                    return invoke.getClassInstance(classLoader);
+                }
+            }
+            return null;
+        });
+    }
+
+    public synchronized static Method loadReceiptMainCallerMethod(ClassLoader classLoader) throws Exception {
+        return UnobfuscatorCache.getInstance().getMethod(classLoader, () -> {
+            var receiptMethod = loadReceiptMethod(classLoader);
+            var methodReceiptData = dexkit.getMethodData(receiptMethod);
+            if (methodReceiptData == null) return null;
+            var classData = methodReceiptData.getDeclaredClass();
+            var messageInfoClass = loadReceiptMessageInfoClass(classLoader);
+            if (messageInfoClass == null) return null;
+
+            var methods = classData.findMethod(
+                    FindMethod.create().matcher(
+                            MethodMatcher.create()
+                                    .addInvoke(methodReceiptData.getDescriptor())
+                                    .paramCount(1)
+                                    .paramTypes(messageInfoClass.getName())
+                                    .usingStrings(Collections.singletonList("class"), StringMatchType.Contains, false)
+                    )
+            );
+            if (methods.isEmpty()) return null;
+            return methods.get(0).getMethodInstance(classLoader);
+        });
+    }
+
+    public synchronized static Method[] loadReceiptCallersMethod(ClassLoader classLoader) throws Exception {
+        return UnobfuscatorCache.getInstance().getMethods(classLoader, () -> {
+            var methodReceiptMainCaller = loadReceiptMainCallerMethod(classLoader);
+            var methodData = dexkit.getMethodData(methodReceiptMainCaller);
+            if (methodData == null) return null;
+            var methods = new ArrayList<Method>();
+            for (var methodCaller : methodData.getCallers()) {
+                if (methodCaller.getParamCount() > 1 && methodCaller.getParamTypes().get(0).getSimpleName().equals("Message")) {
+                    methods.add(methodCaller.getMethodInstance(classLoader));
+                }
+            }
+            if (methods.isEmpty()) return null;
+            return methods.toArray(new Method[0]);
+        });
+    }
 
     public synchronized static List<String> findCallers(Method targetMethod) {
         try {
             var callers = dexkit.findMethod(
-                org.luckypray.dexkit.query.FindMethod.create().matcher(
-                    org.luckypray.dexkit.query.matchers.MethodMatcher.create()
-                        .addInvoke(org.luckypray.dexkit.util.DexSignUtil.getMethodDescriptor(targetMethod))
+                FindMethod.create().matcher(
+                    MethodMatcher.create()
+                        .addInvoke(DexSignUtil.getMethodDescriptor(targetMethod))
                 )
             );
             return callers.stream().map(c -> c.getDescriptor()).collect(Collectors.toList());
